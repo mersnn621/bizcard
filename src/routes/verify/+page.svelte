@@ -5,9 +5,6 @@
     verifySignature,
     type Payload 
   } from '$lib/crypto';
-  import type { PageData } from './$types';
-
-  export let data: PageData;
 
   let latitude = '';
   let longitude = '';
@@ -17,11 +14,20 @@
   let isVerifying = false;
   let verificationResult: boolean | null = null;
   let error: string | null = null;
+  let pubkey: string | null = null;
 
   onMount(async () => {
-    // サーバーからデータを受け取る（既にdata propに含まれている）
-    if (!data.publicKey) {
-      error = 'サーバーデータの読み込みに失敗しました';
+    // https://HOST/config/pubkey.pem からデータを取得
+    try {
+      const response = await fetch('/config/pubkey.pem');
+      if (!response.ok) {
+        throw new Error('公開鍵の取得に失敗しました');
+      }
+      const publicKeyPem = await response.text();
+      pubkey = publicKeyPem.trim();
+    } catch (err) {
+      error = err instanceof Error ? err.message : '公開鍵の取得中にエラーが発生しました';
+      console.error('Error fetching public key:', error);
     }
   });
 
@@ -58,7 +64,7 @@
       };
 
       // 公開鍵をインポート
-      const publicKey = await importPublicKey(data.publicKey);
+      const publicKey = await importPublicKey(pubkey ? pubkey : '');
 
       // 署名を検証
       verificationResult = await verifySignature(payload, signature.trim(), publicKey);
@@ -184,7 +190,7 @@
           <button 
             type="button"
             on:click={verifyCard} 
-            disabled={isVerifying || !data.publicKey}
+            disabled={isVerifying || pubkey === null}
             class="flex-1 bg-slate-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
           >
             {#if isVerifying}
